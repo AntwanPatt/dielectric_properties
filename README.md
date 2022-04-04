@@ -1,1 +1,1 @@
-# dielectric_properties
+# Dielectric properties
