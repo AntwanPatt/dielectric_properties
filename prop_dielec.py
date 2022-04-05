@@ -19,12 +19,18 @@ class prop_dielec:
     """Pyton class to compute dielectric properties"""
 
     def __init__(self, tot_dip_moments, arg2):
-        # Getting total dipole moments distribution and converting it to Debye
+        # getting total dipole moments distribution and converting it to Debye
         self.M = tot_dip_moments / D2eA
+
+        # time between two estimates of M
+        self.dt = None
 
         self.truc = arg2
 
     def static_eps(self):
+        ## initializing time vector
+        time = np.arange(len(self.M)) * self.dt
+        
         ## initializing vectors for <|M|^2> and |<M>|^2
         M2_avg = np.zeros((len(self.M), 1))
         Mavg_2 = np.zeros((len(self.M), 1))
@@ -40,15 +46,19 @@ class prop_dielec:
         Mratio = np.divide(Mavg_2, M2_avg)
 
         ## need temperature and volume to calculate
+        ## TO DO: * insert a thermo analysis class here
         eps_r = 0.0
+        thermo_file = "avg.res"
         try:
-            temperature = np.mean(np.loadtxt("avg2.res", skiprows=2, usecols=(1)))
-            volume      = np.mean(np.loadtxt("avg2.res", skiprows=2, usecols=(4)))
+            temperature = np.mean(np.loadtxt(thermo_file, skiprows=2, usecols=(1)))
+            volume      = np.mean(np.loadtxt(thermo_file, skiprows=2, usecols=(4)))
         except FileNotFoundError:
-            print("Pas de fichier avg2 au fait")
-        else:
-            ## calculating static dielectric constant (relative permittivity), eps_r
-            eps_r = 1 + (Mdiff * fac) / (3 * eps_0 * volume * 1e-30 * kB * temperature)
+            print("The file containing the thermodynamic quantities, {:s}, \
+                    \ cannot be found".format(thermo_file))
+            exit()
+
+        ## calculating static dielectric constant (relative permittivity), eps_r
+        eps_r = 1 + (Mdiff * fac) / (3 * eps_0 * volume * 1e-30 * kB * temperature)
 
         return eps_r
 
