@@ -8,7 +8,7 @@ Main quantities of interest:
 * frenquency dependent dielectric function
 
 TO DO:
-````
+```
 * class/function to calculate static dielectric constant
 * class/function to calculate ACF of M
 * class/function to calculte dielectric function
