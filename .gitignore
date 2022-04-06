@@ -2,3 +2,5 @@
 epsilon.py
 ACF_M.py
 *.res
+*trj
+*sample

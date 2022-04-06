@@ -32,23 +32,27 @@ trajectory file, Mfrom = 'traj'.")
         else:
             self.Mfile = Mfile
 
-        self.M = self.getM()
-
-        # getting total dipole moments distribution and converting it to Debye
-        self.M = tot_dip_moments / D2eA
-
         # time between two estimates of M
         # for ACF, must check if dt is sufficiently lower than correlen
         self.dt = None
 
-    def getM(self, ):
+        self.getM()
+
+    def getM(self):
         # function to get M either reading output file from LAMMPS
         # or by analysing trajectory
+        if self.Mfrom == 'res':
+            self.time = np.loadtxt(self.Mfile, usecols=(0))
+            self.dt   = self.time[1]-self.time[0]
+            # getting total dipole moments distribution and converting it to Debye
+            self.M    = np.loadtxt(self.Mfile, usecols=(1,2,3)) / D2eA
+        elif self.Mfrom == 'traj':
+            print("This is traj")
 
 
     def static_eps(self):
         ## initializing time vector
-        time = np.arange(len(self.M)) * self.dt
+        #time = np.arange(len(self.M)) * self.dt
 
         ## initializing vectors for <|M|^2> and |<M>|^2
         M2_avg = np.zeros((len(self.M), 1))
@@ -89,4 +93,4 @@ trajectory file, Mfrom = 'traj'.")
 # test code of the above class
 if __name__ == '__main__':
     A = np.ones((3,3))
-    test = prop_dielec(A, Mfrom='res', Mfile='M.res')
+    test = prop_dielec(A, Mfrom='res', Mfile='total_dipole_moments.res.sample')
