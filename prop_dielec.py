@@ -7,6 +7,9 @@
 """
 import numpy as np
 import numpy.linalg as nl
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+from scipy.integrate import trapz
 
 ## some constants
 eps_0 = 8.85418781762039e-12 # vacuum permittivity
@@ -55,8 +58,8 @@ trajectory file, Mfrom = 'traj'.")
         #time = np.arange(len(self.M)) * self.dt
 
         ## initializing vectors for <|M|^2> and |<M>|^2
-        M2_avg = np.zeros((len(self.M), 1))
-        Mavg_2 = np.zeros((len(self.M), 1))
+        M2_avg = np.zeros(len(self.M))
+        Mavg_2 = np.zeros(len(self.M))
 
         ## running averages
         for i in range(len(self.M)):
@@ -84,10 +87,63 @@ trajectory file, Mfrom = 'traj'.")
         eps_r = 1 + (Mdiff * fac) / (3 * eps_0 * volume * 1e-30 * kB * temperature)
 
         ## output results
-
+        outfile = "Mtot2_epsr.res"
+        outres = np.vstack((self.time/1e6, M2_avg, Mavg_2, Mdiff, Mratio, eps_r)).transpose()
+        header  = "Running averages of Mtot related quantities and static epsilon"
+        header += "\n Time (ns - <|M|^2> (D^2) - |<M>|^2 (D^2) - <|M|^2>-|<M>|^2 (D^2) - <|M|^2>/|<M>|^2 - epsilon_r"
+        np.savetxt(outfile, outres, header = header)
 
         return eps_r
 
+    def autocorr(self, X):
+        """ the convolution is actually being done here
+        meaning from -inf to inf so we only want half the
+        array"""
+
+    result = np.correlate(X, X, mode='full')
+    return result[int(result.size/2):]
+
+    def ACF_M(self):
+        dt = 100
+        corlen = 1000
+        total = len(M)
+
+
+
+        MACF = np.zeros(corlen)
+
+        blocks = range(corlen, total, corlen)
+        for t in blocks:
+            for i in range(3):
+                MACF += autocorr(M[t-corlen:t,i])
+
+        MACF /= len(blocks)
+        MACF /= MACF[0]
+
+        x = np.arange(corlen)*dt/1e3
+
+        popt, pcov = curve_fit(lambda t, tau: np.exp(- t / tau), x, MACF, p0=(10))
+
+        tau = popt[0]
+
+        y_fitted = np.exp(- x / tau)
+
+        I_trapz = trapz(MACF, x)
+
+        x = x.reshape(len(x),1)
+        MACF = MACF.reshape(len(MACF),1)
+        y_fitted= y_fitted.reshape(len(y_fitted),1)
+
+        data = np.append(x, MACF, axis = 1)
+        data = np.append(data, y_fitted, axis = 1)
+
+        np.savetxt("ACF.res", data)
+
+        #plt.plot(x,MACF,'k')
+        #plt.plot(x, y_fitted)
+        #plt.ylabel(r'$\frac{M(t)\cdot M(0)}{M(0)\cdot M(0)}$',fontsize=20)
+        #plt.xlabel('Time [ps]')
+        #plt.show()
 ################################################################################
 
 # test code of the above class
