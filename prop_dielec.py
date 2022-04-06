@@ -16,8 +16,10 @@ eps_0 = 8.85418781762039e-12 # vacuum permittivity
 kB    = 1.380649e-23         # boltzmann constant
 e2C   = 1.602176634e-19      # elementary charge in C
 D2eA  = 0.20819434           # debye to e.A
+A2m   = 1.0e-30              # angstrom to meter
 fac   = 1.112650021e-59      # conversion factor Debye^2->C^2m^2
 
+################################################################################
 class prop_dielec:
     """Pyton class to compute dielectric properties"""
 
@@ -45,6 +47,7 @@ trajectory file, Mfrom = 'traj'.")
         # function to get M either reading output file from LAMMPS
         # or by analysing trajectory
         if self.Mfrom == 'res':
+            # timesteps vector
             self.time = np.loadtxt(self.Mfile, usecols=(0))
             self.dt   = self.time[1]-self.time[0]
             # getting total dipole moments distribution and converting it to Debye
@@ -54,9 +57,6 @@ trajectory file, Mfrom = 'traj'.")
 
 
     def static_eps(self):
-        ## initializing time vector
-        #time = np.arange(len(self.M)) * self.dt
-
         ## initializing vectors for <|M|^2> and |<M>|^2
         M2_avg = np.zeros(len(self.M))
         Mavg_2 = np.zeros(len(self.M))
@@ -84,13 +84,13 @@ trajectory file, Mfrom = 'traj'.")
             exit()
 
         ## calculating static dielectric constant (relative permittivity), eps_r
-        eps_r = 1 + (Mdiff * fac) / (3 * eps_0 * volume * 1e-30 * kB * temperature)
+        eps_r = 1 + (Mdiff * fac) / (3 * eps_0 * volume * A2m * kB * temperature)
 
-        ## output results
+        ## outputting the results
         outfile = "Mtot2_epsr.res"
-        outres = np.vstack((self.time/1e6, M2_avg, Mavg_2, Mdiff, Mratio, eps_r)).transpose()
+        outres  = np.vstack((self.time, M2_avg, Mavg_2, Mdiff, Mratio, eps_r)).transpose()
         header  = "Running averages of Mtot related quantities and static epsilon"
-        header += "\n Time (ns - <|M|^2> (D^2) - |<M>|^2 (D^2) - <|M|^2>-|<M>|^2 (D^2) - <|M|^2>/|<M>|^2 - epsilon_r"
+        header += "\n Time (fs - <|M|^2> (D^2) - |<M>|^2 (D^2) - <|M|^2>-|<M>|^2 (D^2) - <|M|^2>/|<M>|^2 - epsilon_r"
         np.savetxt(outfile, outres, header = header)
 
         return eps_r
@@ -104,11 +104,8 @@ trajectory file, Mfrom = 'traj'.")
     return result[int(result.size/2):]
 
     def ACF_M(self):
-        dt = 100
         corlen = 1000
         total = len(M)
-
-
 
         MACF = np.zeros(corlen)
 
@@ -120,7 +117,7 @@ trajectory file, Mfrom = 'traj'.")
         MACF /= len(blocks)
         MACF /= MACF[0]
 
-        x = np.arange(corlen)*dt/1e3
+        x = np.arange(corlen)*self.dt/1e3
 
         popt, pcov = curve_fit(lambda t, tau: np.exp(- t / tau), x, MACF, p0=(10))
 
@@ -144,6 +141,7 @@ trajectory file, Mfrom = 'traj'.")
         #plt.ylabel(r'$\frac{M(t)\cdot M(0)}{M(0)\cdot M(0)}$',fontsize=20)
         #plt.xlabel('Time [ps]')
         #plt.show()
+
 ################################################################################
 
 # test code of the above class
