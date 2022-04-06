@@ -18,19 +18,38 @@ fac   = 1.112650021e-59      # conversion factor Debye^2->C^2m^2
 class prop_dielec:
     """Pyton class to compute dielectric properties"""
 
-    def __init__(self, tot_dip_moments, arg2):
+    def __init__(self, tot_dip_moments, Mfrom = 'res', Mfile = None):
+        # get M function ?
+        if Mfrom not in ['res', 'traj']:
+            raise ValueError("Total dipole moments distribution has to be obtained \
+either directly from results file, Mfrom = 'res', or by analysing \
+trajectory file, Mfrom = 'traj'.")
+        else:
+            self.Mfrom = Mfrom
+
+        if Mfile is None:
+            raise FileNotFoundError("Filename missing to obtain total dipole moments distribution.")
+        else:
+            self.Mfile = Mfile
+
+        self.M = self.getM()
+
         # getting total dipole moments distribution and converting it to Debye
         self.M = tot_dip_moments / D2eA
 
         # time between two estimates of M
+        # for ACF, must check if dt is sufficiently lower than correlen
         self.dt = None
 
-        self.truc = arg2
+    def getM(self, ):
+        # function to get M either reading output file from LAMMPS
+        # or by analysing trajectory
+
 
     def static_eps(self):
         ## initializing time vector
         time = np.arange(len(self.M)) * self.dt
-        
+
         ## initializing vectors for <|M|^2> and |<M>|^2
         M2_avg = np.zeros((len(self.M), 1))
         Mavg_2 = np.zeros((len(self.M), 1))
@@ -60,6 +79,9 @@ class prop_dielec:
         ## calculating static dielectric constant (relative permittivity), eps_r
         eps_r = 1 + (Mdiff * fac) / (3 * eps_0 * volume * 1e-30 * kB * temperature)
 
+        ## output results
+
+
         return eps_r
 
 ################################################################################
@@ -67,4 +89,4 @@ class prop_dielec:
 # test code of the above class
 if __name__ == '__main__':
     A = np.ones((3,3))
-    test = prop_dielec(A, "haha")
+    test = prop_dielec(A, Mfrom='res', Mfile='M.res')
