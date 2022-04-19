@@ -23,8 +23,7 @@ fac   = 1.112650021e-59      # conversion factor Debye^2->C^2m^2
 class prop_dielec:
     """Pyton class to compute dielectric properties"""
 
-    def __init__(self, tot_dip_moments, Mfrom = 'res', Mfile = None):
-        # get M function ?
+    def __init__(self, tot_dip_moments, Mfrom = 'res', Mfile = None, dt = None):
         if Mfrom not in ['res', 'traj']:
             raise ValueError("Total dipole moments distribution has to be obtained \
 either directly from results file, Mfrom = 'res', or by analysing \
@@ -32,14 +31,17 @@ trajectory file, Mfrom = 'traj'.")
         else:
             self.Mfrom = Mfrom
 
+        if dt is None:
+            raise ValueError("The timestep (in fs) used in the simulation is not provided.")
+        else:
+            self.dt = dt
+
         if Mfile is None:
             raise FileNotFoundError("Filename missing to obtain total dipole moments distribution.")
         else:
             self.Mfile = Mfile
 
-        # time between two estimates of M
-        # for ACF, must check if dt is sufficiently lower than correlen
-        self.dt = None
+        self.dtM = None
 
         self.getM()
 
@@ -47,16 +49,17 @@ trajectory file, Mfrom = 'traj'.")
         # function to get M either reading output file from LAMMPS
         # or by analysing trajectory
         if self.Mfrom == 'res':
-            # timesteps vector
-            self.time = np.loadtxt(self.Mfile, usecols=(0))
-            self.dt   = self.time[1]-self.time[0]
+            # timesteps number vector
+            self.time = np.loadtxt(self.Mfile, usecols=(0)) * self.dt
+            # time between two estimates of M
+            self.dtM   = (self.time[1]-self.time[0])
             # getting total dipole moments distribution and converting it to Debye
             self.M    = np.loadtxt(self.Mfile, usecols=(1,2,3)) / D2eA
         elif self.Mfrom == 'traj':
             print("This is traj")
 
 
-    def static_eps(self):
+    def calc_stateps(self):
         ## initializing vectors for <|M|^2> and |<M>|^2
         M2_avg = np.zeros(len(self.M))
         Mavg_2 = np.zeros(len(self.M))
@@ -74,8 +77,9 @@ trajectory file, Mfrom = 'traj'.")
         ## need temperature and volume to calculate
         ## TO DO: * insert a thermo analysis class here
         eps_r = 0.0
-        thermo_file = "avg.res"
+
         try:
+            thermo_file = "avg.res"
             temperature = np.mean(np.loadtxt(thermo_file, skiprows=2, usecols=(1)))
             volume      = np.mean(np.loadtxt(thermo_file, skiprows=2, usecols=(4)))
         except FileNotFoundError:
@@ -90,7 +94,7 @@ trajectory file, Mfrom = 'traj'.")
         outfile = "Mtot2_epsr.res"
         outres  = np.vstack((self.time, M2_avg, Mavg_2, Mdiff, Mratio, eps_r)).transpose()
         header  = "Running averages of Mtot related quantities and static epsilon"
-        header += "\n Time (fs - <|M|^2> (D^2) - |<M>|^2 (D^2) - <|M|^2>-|<M>|^2 (D^2) - <|M|^2>/|<M>|^2 - epsilon_r"
+        header += "\n Time (fs) - <|M|^2> (D^2) - |<M>|^2 (D^2) - <|M|^2>-|<M>|^2 (D^2) - <|M|^2>/|<M>|^2 - epsilon_r"
         np.savetxt(outfile, outres, header = header)
 
         return eps_r
@@ -100,39 +104,38 @@ trajectory file, Mfrom = 'traj'.")
         meaning from -inf to inf so we only want half the
         array"""
 
-    result = np.correlate(X, X, mode='full')
-    return result[int(result.size/2):]
+        result = np.correlate(X, X, mode='full')
+        return result[int(result.size/2):]
 
-    def ACF_M(self):
-        corlen = 1000
-        total = len(M)
+    def calc_ACFM(self, cortime = None):
+        if cortime is None:
+            raise ValueError("The time window (in fs) for the ACF calculation is not provided.")
+        else:
+            self.cortime = cortime
 
-        MACF = np.zeros(corlen)
+        # for ACF, must check if dt is sufficiently lower than correlen
+        if self.cortime < self.dtM * 1e3:
+            raise ValueError("The time window must exceed the time between two values \
+            of M by at least a thousand folds, for better statistics.")
 
-        blocks = range(corlen, total, corlen)
+        corsteps = int(np.floor(self.cortime / self.dtM))
+
+        self.MACF = np.zeros(corsteps)
+
+        blocks = range(corsteps, len(self.M), corsteps)
+
         for t in blocks:
             for i in range(3):
-                MACF += autocorr(M[t-corlen:t,i])
+                self.MACF += self.autocorr(self.M[t-corsteps:t,i])
 
-        MACF /= len(blocks)
-        MACF /= MACF[0]
+        ## normalization of the ACF of M by the numbler of blocks and M(0)**2
+        self.MACF /= len(blocks)
+        self.MACF /= self.MACF[0]
 
-        x = np.arange(corlen)*self.dt/1e3
+        ## time vector for MACF in the given time window
+        self.tACF = np.arange(corsteps) * self.dtM
 
-        popt, pcov = curve_fit(lambda t, tau: np.exp(- t / tau), x, MACF, p0=(10))
-
-        tau = popt[0]
-
-        y_fitted = np.exp(- x / tau)
-
-        I_trapz = trapz(MACF, x)
-
-        x = x.reshape(len(x),1)
-        MACF = MACF.reshape(len(MACF),1)
-        y_fitted= y_fitted.reshape(len(y_fitted),1)
-
-        data = np.append(x, MACF, axis = 1)
-        data = np.append(data, y_fitted, axis = 1)
+        data = np.vstack((self.tACF, self.MACF)).transpose()
 
         np.savetxt("ACF.res", data)
 
@@ -142,9 +145,24 @@ trajectory file, Mfrom = 'traj'.")
         #plt.xlabel('Time [ps]')
         #plt.show()
 
+    def integ_ACFM(self):
+        I_trapz = trapz(self.MACF, self.tACF)
+        return I_trapz
+
+    def fit_ACFM(self):
+        ## Debye model
+        popt, pcov = curve_fit(lambda t, tau: np.exp(- t / tau), self.tACF, self.MACF, p0=(10))
+
+        tau = popt[0]
+
+        y_fitted = np.exp(- self.tACF / tau)
+        y_fitted= y_fitted.reshape(len(y_fitted),1)
+
+        return tau
+
 ################################################################################
 
 # test code of the above class
 if __name__ == '__main__':
     A = np.ones((3,3))
-    test = prop_dielec(A, Mfrom='res', Mfile='total_dipole_moments.res.sample')
+    test = prop_dielec(A, Mfrom='res', Mfile='total_dipole_moments.res', dt=1.)
