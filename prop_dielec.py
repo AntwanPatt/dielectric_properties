@@ -23,7 +23,7 @@ fac   = 1.112650021e-59      # conversion factor Debye^2->C^2m^2
 class prop_dielec:
     """Pyton class to compute dielectric properties"""
 
-    def __init__(self, tot_dip_moments, Mfrom = 'res', Mfile = None, dt = None):
+    def __init__(self, Mfrom = 'res', Mfile = None, dt = None):
         if Mfrom not in ['res', 'traj']:
             raise ValueError("Total dipole moments distribution has to be obtained \
 either directly from results file, Mfrom = 'res', or by analysing \
@@ -164,5 +164,4 @@ trajectory file, Mfrom = 'traj'.")
 
 # test code of the above class
 if __name__ == '__main__':
-    A = np.ones((3,3))
-    test = prop_dielec(A, Mfrom='res', Mfile='total_dipole_moments.res', dt=1.)
+    test = prop_dielec(Mfrom='res', Mfile='total_dipole_moments.res', dt=1.)
