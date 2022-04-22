@@ -9,8 +9,8 @@ Main quantities of interest:
 
 TO DO:
 ```
-* class/function to calculate static dielectric constant
-* class/function to calculate ACF of M
-* class/function to calculte dielectric function
-* class/function to either get M from data outfile of LAMMPS or from trajectory
+* calculate dielectric function from fit
+* get M from trajectory
+* calculate Fourier transform of ACF
+* calculate dielectric function from Fourier transform
 ```

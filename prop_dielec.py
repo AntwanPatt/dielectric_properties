@@ -160,6 +160,8 @@ trajectory file, Mfrom = 'traj'.")
 
         return tau
 
+    def fft_ACFM(self):
+
 ################################################################################
 
 # test code of the above class
