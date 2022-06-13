@@ -92,12 +92,10 @@ trajectory file, Mfrom = 'traj'.")
 
                 ### Calculating total dipole moment for a frame
                 # Centers of charges
-                #for i in range(Natoms):
                 # charge -> index 5 of data
-                # Identifying the positive and negative charges
-                ind_posQ = np.array(O_neigh[i])[data[:, 5] > 0.]
-                ind_negQ = np.array(O_neigh[i])[data[:, 5] < 0.]
-
+                # Identifying the positive and negative charge
+                ind_posQ = data[:, 5] > 0.
+                ind_posQ = data[:, 5] < 0.
                 posQ = data[data[:, 5] > 0.]
                 negQ = data[data[:, 5] < 0.]
 
