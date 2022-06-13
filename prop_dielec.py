@@ -55,8 +55,59 @@ trajectory file, Mfrom = 'traj'.")
             self.dtM   = (self.time[1]-self.time[0])
             # getting total dipole moments distribution and converting it to Debye
             self.M    = np.loadtxt(self.Mfile, usecols=(1,2,3)) / D2eA
+
         elif self.Mfrom == 'traj':
             print("This is traj")
+            # Opening trajectory file
+            f = open(self.Mfile, "r")
+            lines = f.readlines()
+
+            # Counting number of configurations
+            conf = 0
+            for line in lines:
+                if "TIMESTEP" in line:
+                    conf += 1
+
+            # Setting up some variables
+            start_conf = 0
+
+            self.M = np.zeros((conf - start_conf, 3))
+
+            conf_count = 0
+            line_count = 0
+
+            # Reading the number of atoms
+            Natoms = int(lines[line_count+3])
+
+            ### Processing the configurations
+            while (conf_count < (conf - start_conf)):
+                print(conf_count + start_conf)
+                # Updating the line count
+                line_count = (9 + Natoms) * (conf_count + start_conf)
+                # Reading the box length of the configuration
+                L = np.zeros(3) + float(lines[line_count+5].split()[1])*2
+                # and the rest of the data (label, positions, charge) of each atoms
+                data = np.loadtxt(infile, skiprows=line_count+9, max_rows=Natoms)
+                pos  = data[:,2:5]
+
+                ### Calculating total dipole moment for a frame
+                # Centers of charges
+                #for i in range(Natoms):
+                # charge -> index 5 of data
+                # Identifying the positive and negative charges
+                ind_posQ = np.array(O_neigh[i])[data[:, 5] > 0.]
+                ind_negQ = np.array(O_neigh[i])[data[:, 5] < 0.]
+
+                posQ = data[data[:, 5] > 0.]
+                negQ = data[data[:, 5] < 0.]
+
+                np.sum(posQ)
+
+                # Summing molecular dipole moments
+                self.M[conf_count] = np.sum(mu, axis=0)
+                #M[conf_count] = np.linalg.norm(np.sum(mu, axis=0))
+
+                conf_count += 1
 
 
     def calc_stateps(self):
@@ -160,7 +211,7 @@ trajectory file, Mfrom = 'traj'.")
 
         return tau
 
-    
+
 #    def fft_ACFM(self):
 
 ################################################################################
