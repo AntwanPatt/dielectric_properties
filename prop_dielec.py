@@ -84,28 +84,58 @@ trajectory file, Mfrom = 'traj'.")
                 print(conf_count + start_conf)
                 # Updating the line count
                 line_count = (9 + Natoms) * (conf_count + start_conf)
+
                 # Reading the box length of the configuration
-                L = np.zeros(3) + float(lines[line_count+5].split()[1])*2
+                # !!! Care with handling orthogonal or triclinic cell, not same format in LAMMPS output
+                #L = np.zeros(3) + float(lines[line_count+5].split()[1])*2
+                if "xy" in lines[line_count + 4]:
+                    xlo, xhi, xy = float(lines[line_count+5].split())
+                    ylo, yhi, xz = float(lines[line_count+5].split())
+                    zlo, zhi, yz = float(lines[line_count+5].split())
+                    lx = xhi - xlo
+                    ly = yhi - ylo
+                    lz = zhi - zlo
+
+                    a = lx
+                    b = np.sqrt(ly**2 + xy**2)
+                    c = np.sqrt(lz**2 + xz**2 + yz**2)
+                    alpha = np.arccos((xy * xz + ly * yz) / (b * c))
+                    beta = np.arccos(xz / c)
+                    gamma = np.arccos(xy / b)
+
+                edges  = np.array([a, b, c])
+                angles = np.array([alpha, beta, gamma])
+
                 # and the rest of the data (label, positions, charge) of each atoms
                 data = np.loadtxt(infile, skiprows=line_count+9, max_rows=Natoms)
                 pos  = data[:,2:5]
 
                 ### Calculating total dipole moment for a frame
-                # Centers of charges
-                # charge -> index 5 of data
                 # Identifying the positive and negative charge
                 ind_posQ = data[:, 5] > 0.
-                ind_posQ = data[:, 5] < 0.
-                posQ = data[data[:, 5] > 0.]
-                negQ = data[data[:, 5] < 0.]
+                ind_negQ = data[:, 5] < 0.
 
-                np.sum(posQ)
+                # Centers of charges
+                bar_posQ = np.sum(data[ind_posQ,2:5] * data[ind_posQ,5]) / np.sum(data[ind_posQ,5])
+                bar_negQ = np.sum(data[ind_posQ,2:5] * data[ind_posQ,5]) / np.sum(data[ind_posQ,5])
+
+                # Check periodic boundary conditions for the distance between
+                # the two charge barycentres
+
+                # Calculate the total dipole moment of the frame
+
 
                 # Summing molecular dipole moments
-                self.M[conf_count] = np.sum(mu, axis=0)
+                #self.M[conf_count] = np.sum(mu, axis=0)
                 #M[conf_count] = np.linalg.norm(np.sum(mu, axis=0))
 
                 conf_count += 1
+
+    def coord_conv_matrix():
+        if angle_in_degrees:
+            alpha = np.deg2rad(alpha)
+            beta = np.deg2rad(beta)
+            gamma = np.deg2rad(gamma)
 
 
     def calc_stateps(self):
