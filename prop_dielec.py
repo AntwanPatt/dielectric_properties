@@ -81,7 +81,7 @@ trajectory file, Mfrom = 'traj'.")
 
             ### Processing the configurations
             while (conf_count < (conf - start_conf)):
-                print(conf_count + start_conf)
+                #print(conf_count + start_conf)
                 # Updating the line count
                 line_count = (9 + Natoms) * (conf_count + start_conf)
 
@@ -89,9 +89,10 @@ trajectory file, Mfrom = 'traj'.")
                 # !!! Care with handling orthogonal or triclinic cell, not same format in LAMMPS output
                 #L = np.zeros(3) + float(lines[line_count+5].split()[1])*2
                 if "xy" in lines[line_count + 4]:
-                    xlo, xhi, xy = float(lines[line_count+5].split())
-                    ylo, yhi, xz = float(lines[line_count+5].split())
-                    zlo, zhi, yz = float(lines[line_count+5].split())
+                    #lines[line_count+7]
+                    xlo, xhi, xy = np.array(lines[line_count+5].split())
+                    ylo, yhi, xz = np.array(lines[line_count+6].split())
+                    zlo, zhi, yz = np.array(lines[line_count+7].split())
                     lx = xhi - xlo
                     ly = yhi - ylo
                     lz = zhi - zlo
@@ -103,11 +104,29 @@ trajectory file, Mfrom = 'traj'.")
                     beta = np.arccos(xz / c)
                     gamma = np.arccos(xy / b)
 
-                edges  = np.array([a, b, c])
-                angles = np.array([alpha, beta, gamma])
+                    edges  = np.array([a, b, c])
+                    angles = np.array([alpha, beta, gamma])
+
+                else:
+                    xlo, xhi = np.array(lines[line_count+5].split()).astype(float)
+                    ylo, yhi = np.array(lines[line_count+6].split()).astype(float)
+                    zlo, zhi = np.array(lines[line_count+7].split()).astype(float)
+                    lx = xhi - xlo
+                    ly = yhi - ylo
+                    lz = zhi - zlo
+
+                    a = lx
+                    b = ly
+                    c = lz
+
+                    edges  = np.array([a, b, c])
+                    angles = np.array([90.0, 90.0, 90.0])
+
+                A_f2c = A_c2f = np.zeros((3, 3))
+                A_f2c, A_c2f = self.coord_conv_matrix(edges, angles)
 
                 # and the rest of the data (label, positions, charge) of each atoms
-                data = np.loadtxt(infile, skiprows=line_count+9, max_rows=Natoms)
+                data = np.loadtxt(self.Mfile, skiprows=line_count+9, max_rows=Natoms)
                 pos  = data[:,2:5]
 
                 ### Calculating total dipole moment for a frame
@@ -131,12 +150,45 @@ trajectory file, Mfrom = 'traj'.")
 
                 conf_count += 1
 
-    def coord_conv_matrix():
-        if angle_in_degrees:
-            alpha = np.deg2rad(alpha)
-            beta = np.deg2rad(beta)
-            gamma = np.deg2rad(gamma)
+    def coord_conv_matrix(self, edges, angles, angle_in_degrees = True):
+        try:
+            a, b, c = edges
+        except:
+            a = b = c = edges
 
+        try:
+            alpha, beta, gamma = angles
+        except:
+            alpha = beta = gamma = angles
+
+        if angle_in_degrees:
+            angles = np.deg2rad(angles)
+
+        cosa, cosb, cosg = np.cos(angles)
+        sina, sinb, sing = np.sin(angles)
+
+        V = 1.0 - cosa**2.0 - cosb**2.0 - cosg**2.0 + 2.0 * cosa * cosb * cosg
+        V = np.sqrt(V)
+
+        # Frac to cart
+        n1 = (cosa - cosb * cosg) / sing
+        A_f2c = np.zeros((3, 3))
+        A_f2c = np.array([[a,  b * cosg, c * cosb     ],
+                          [0., b * sing, c * n1       ],
+                          [0., 0.,       c * V / sing]])
+        A_f2c = np.where(np.abs(A_f2c) < 1e-9, 0.0, A_f2c)
+
+        # Cart to frac
+        n2 = (cosa * cosg - cosb) / sing
+        n3 = (cosb * cosg - cosa) / sing
+
+        A_c2f = np.zeros((3, 3))
+        A_c2f = np.array([[1.0 / a, -cosg / (a * sing), n2   / (a * V)],
+                          [0.,      1.0   / (b * sing), n3   / (b * V)],
+                          [0.,      0.,                 sing / (c * V)]])
+        A_c2f = np.where(np.abs(A_c2f) < 1e-9, 0.0, A_c2f)
+
+        return A_f2c, A_c2f
 
     def calc_stateps(self):
         ## initializing vectors for <|M|^2> and |<M>|^2
@@ -246,4 +298,5 @@ trajectory file, Mfrom = 'traj'.")
 
 # test code of the above class
 if __name__ == '__main__':
-    test = prop_dielec(Mfrom='res', Mfile='total_dipole_moments.res', dt=1.)
+    #test = prop_dielec(Mfrom='res', Mfile='total_dipole_moments.res', dt=1.)
+    test = prop_dielec(Mfrom='traj', Mfile='1conf_H2O_sample.trj', dt=1.)
