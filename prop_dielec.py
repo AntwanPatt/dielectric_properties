@@ -10,6 +10,7 @@ import numpy.linalg as nl
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.integrate import trapz
+import scipy.spatial as sci
 
 ## some constants
 eps_0 = 8.85418781762039e-12 # vacuum permittivity
@@ -130,25 +131,123 @@ trajectory file, Mfrom = 'traj'.")
                 pos  = data[:,2:5]
 
                 ### Calculating total dipole moment for a frame
-                # Identifying the positive and negative charge
-                ind_posQ = data[:, 5] > 0.
-                ind_negQ = data[:, 5] < 0.
+                whole = True
+                # Whole box
+                if (whole):
+                    # Identifying the positive and negative charge
+                    ind_posQ = data[:, 5] > 0.
+                    ind_negQ = data[:, 5] < 0.
 
-                # Centers of charges
-                bar_posQ = np.sum(data[ind_posQ,2:5] * data[ind_posQ,5]) / np.sum(data[ind_posQ,5])
-                bar_negQ = np.sum(data[ind_posQ,2:5] * data[ind_posQ,5]) / np.sum(data[ind_posQ,5])
+                    # Centers of charges
+                    posQ = data[ind_posQ,5].reshape(-1,1)
+                    negQ = data[ind_negQ,5].reshape(-1,1)
 
-                # Check periodic boundary conditions for the distance between
-                # the two charge barycentres
+                    r_posQ = data[ind_posQ,2:5]
+                    self.reconstruct_box(r_posQ, edges)
+                    r_negQ = data[ind_negQ,2:5]
+                    self.reconstruct_box(r_negQ, edges)
 
-                # Calculate the total dipole moment of the frame
+                    print(np.max(r_posQ))
+                    print(np.max(r_negQ))
+
+                    #print(r_negQ)
+                    #print(negQ)
+                    #A = r_negQ * negQ
+                    #print(np.sum(A[:,0])/np.sum(negQ))
+
+                    #bar_posQ = np.sum(r_posQ * posQ, axis = 0) / np.sum(posQ)
+                    #bar_negQ = np.sum(r_negQ * negQ, axis = 0) / np.sum(negQ)
+
+                    bar_posQ = np.sum(r_posQ, axis = 0) / len(r_posQ)
+                    bar_negQ = np.sum(r_negQ, axis = 0) / len(r_negQ)
+
+                    #print(bar_negQ)
+                    print(bar_negQ-bar_posQ)
+                    print((bar_negQ-bar_posQ)*np.sum(posQ))
+                    print(np.sum(posQ))
+                    print(np.linalg.norm((bar_negQ-bar_posQ)*np.sum(posQ)))
+
+                    # Check periodic boundary conditions for the distance between
+                    # the two charge barycentres
+
+                    # Calculate the total dipole moment of the frame
 
 
-                # Summing molecular dipole moments
-                #self.M[conf_count] = np.sum(mu, axis=0)
-                #M[conf_count] = np.linalg.norm(np.sum(mu, axis=0))
+                    # Summing molecular dipole moments
+                    #self.M[conf_count] = np.sum(mu, axis=0)
+                    #M[conf_count] = np.linalg.norm(np.sum(mu, axis=0))
+
+                dipoles = False
+                if (dipoles):
+                    print("dipoles")
+                    nSites = 3
+                    # Preparing configuration for periodic kdtree
+                    self.reconstruct_box(pos, edges)
+                    # Computing the tree
+                    tree = sci.cKDTree(pos, boxsize=edges)
+
+                    # Getting the indexes of all oxygen atoms
+                    O = np.where(data[:,1] == 1)[0]
+                    # Searching for the neighbors of O atoms in a given radius
+                    # to identify the water molecules
+                    O_neigh = tree.query_ball_point(pos[O], r=1.2)
+
+                    # Searching for uncomplete water molecules
+                    excluded = np.array([])
+                    for t in range(len(O_neigh)):
+                        if len(O_neigh[t]) != nSites:
+                            excluded=np.append(excluded, t)
+
+                    excluded=excluded.astype(int)
+
+                    # Dipole moment array initialisation
+                    mu = np.zeros([len(O)-len(excluded),3])
+
+                    j = 0
+                    # Loop on all O atoms
+                    for i in range(len(O)):
+                        # but just on whole molecules
+                        if i in excluded: continue
+
+                        # Identifying the charges in the molecule
+                        ind_posQ = np.array(O_neigh[i])[data[O_neigh[i], 5] > 0.]
+                        ind_negQ = np.array(O_neigh[i])[data[O_neigh[i], 5] < 0.]
+                        # Calculating a mean charge because of non exact local neutrality with reax
+                        Qpos = np.sum(data[ind_posQ, 5])
+                        Qneg = np.sum(data[ind_negQ, 5])
+                        Q    = (Qpos - Qneg) / 2.
+
+                        # Barycentre of charges and taking into account PBC
+                        L = edges[0]
+                        bar_pos = np.sum((pos[ind_posQ] - pos[O[i]]) - L*np.around((pos[ind_posQ] - pos[O[i]])/L), axis=0)/len(ind_posQ)
+                        bar_neg = np.sum((pos[ind_negQ] - pos[O[i]]) - L*np.around((pos[ind_negQ] - pos[O[i]])/L), axis=0)/len(ind_negQ)
+
+                        # Direction vector between the 2 barycentres and PBC
+                        pair_bar  = bar_pos - bar_neg
+                        pair_bar -= L * np.around(pair_bar / L)
+
+                        # Computing dipole moment for a molecule
+                        mu[j] = pair_bar * Q
+                        j += 1
+
+
+                if (dipoles):
+                    print(np.sum(mu, axis=0))
 
                 conf_count += 1
+
+    def reconstruct_box(self, positions, box):
+        """ Reconstruct the periodic box by
+            putting every atom in the box,
+            between {[0, L_i]}
+        """
+        for i in range(0,3):
+            ind_neg = positions[:,i] < 0
+            ind_pos = positions[:,i] > box[i]
+            positions[ind_neg,i] += box[i]
+            positions[ind_pos,i] -= box[i]
+
+        return positions
 
     def coord_conv_matrix(self, edges, angles, angle_in_degrees = True):
         try:
