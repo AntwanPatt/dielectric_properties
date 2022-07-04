@@ -167,6 +167,12 @@ trajectory file, Mfrom = 'traj'.")
                     print("Weighted barycentres")
                     print(M_weight)
 
+                whole_alt = True
+                # Whole box
+                if (whole_alt):
+                    M_alt = np.sum(data[:,2:5] * data[:,5].reshape(-1,1), axis=0)
+                    print("M alt")
+                    print(M_alt)
                 ######### TEMPORARY PART
                 ### Calculation of M using the sum of individual dipoles for
                 ### comparisons
