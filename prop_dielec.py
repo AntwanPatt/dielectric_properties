@@ -143,40 +143,33 @@ trajectory file, Mfrom = 'traj'.")
                     negQ = data[ind_negQ,5].reshape(-1,1)
 
                     r_posQ = data[ind_posQ,2:5]
-                    self.reconstruct_box(r_posQ, edges)
                     r_negQ = data[ind_negQ,2:5]
-                    self.reconstruct_box(r_negQ, edges)
-
-                    print(np.max(r_posQ))
-                    print(np.max(r_negQ))
-
-                    #print(r_negQ)
-                    #print(negQ)
-                    #A = r_negQ * negQ
-                    #print(np.sum(A[:,0])/np.sum(negQ))
-
-                    #bar_posQ = np.sum(r_posQ * posQ, axis = 0) / np.sum(posQ)
-                    #bar_negQ = np.sum(r_negQ * negQ, axis = 0) / np.sum(negQ)
 
                     bar_posQ = np.sum(r_posQ, axis = 0) / len(r_posQ)
                     bar_negQ = np.sum(r_negQ, axis = 0) / len(r_negQ)
 
-                    #print(bar_negQ)
-                    print(bar_negQ-bar_posQ)
-                    print((bar_negQ-bar_posQ)*np.sum(posQ))
-                    print(np.sum(posQ))
-                    print(np.linalg.norm((bar_negQ-bar_posQ)*np.sum(posQ)))
+                    pair_bar  = bar_posQ - bar_negQ
+                    pair_bar -= edges * np.around(pair_bar / edges)
 
-                    # Check periodic boundary conditions for the distance between
-                    # the two charge barycentres
+                    M_whole = pair_bar * np.sum(posQ)
+                    print("Whole box")
+                    print(M_whole)
 
-                    # Calculate the total dipole moment of the frame
+                    # Charge weighted barycentres
+                    ###
+                    wbar_posQ = np.sum(r_posQ*posQ, axis = 0) / np.sum(posQ)
+                    wbar_negQ = np.sum(r_negQ*negQ, axis = 0) / np.sum(negQ)
 
+                    wpair_bar  = wbar_posQ - wbar_negQ
+                    wpair_bar -= edges * np.around(wpair_bar / edges)
 
-                    # Summing molecular dipole moments
-                    #self.M[conf_count] = np.sum(mu, axis=0)
-                    #M[conf_count] = np.linalg.norm(np.sum(mu, axis=0))
+                    M_weight = wpair_bar * np.sum(posQ)
+                    print("Weighted barycentres")
+                    print(M_weight)
 
+                ######### TEMPORARY PART
+                ### Calculation of M using the sum of individual dipoles for
+                ### comparisons
                 dipoles = False
                 if (dipoles):
                     print("dipoles")
@@ -233,6 +226,7 @@ trajectory file, Mfrom = 'traj'.")
 
                 if (dipoles):
                     print(np.sum(mu, axis=0))
+                ######### END OF TEMPORARY PART
 
                 conf_count += 1
 
@@ -398,4 +392,4 @@ trajectory file, Mfrom = 'traj'.")
 # test code of the above class
 if __name__ == '__main__':
     #test = prop_dielec(Mfrom='res', Mfile='total_dipole_moments.res', dt=1.)
-    test = prop_dielec(Mfrom='traj', Mfile='1conf_H2O_sample.trj', dt=1.)
+    test = prop_dielec(Mfrom='traj', Mfile='1conf_H2O_final_eq_unwrapped.trj', dt=1.)
